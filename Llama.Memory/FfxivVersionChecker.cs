@@ -1,10 +1,8 @@
-using System;
 using System.Buffers;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace WitchHunt;
+namespace Llama.Memory;
 
 public static class FfxivVersionChecker
 {
@@ -34,7 +32,7 @@ public static class FfxivVersionChecker
     /// <exception cref="PathTooLongException">The executable path exceeds the platform maximum length.</exception>
     /// <exception cref="NotSupportedException">The executable path format is invalid.</exception>
     /// <exception cref="IOException">An I/O error occurs while opening, seeking, or reading the executable stream.</exception>
-    /// <exception cref="EndOfStreamException">The stream ends before <see cref="Stream.ReadExactly(byte[])"/> can fill the requested buffers.</exception>
+    /// <exception cref="EndOfStreamException">The stream ends before <see cref="Stream.ReadExactly(byte[], int, int)"/> can fill the requested buffers.</exception>
     /// <exception cref="ObjectDisposedException">The stream is disposed before a read/seek operation completes.</exception>
     /// <exception cref="Exception">
     /// Propagates exceptions thrown by external parsers/searchers (for example <c>PeHeaderParser.GetPeHeaders</c>, <c>WitchHuntV3</c>, or <c>WitchHuntV3.Search</c>).
@@ -97,7 +95,7 @@ public static class FfxivVersionChecker
             fs.Seek(text.PointerToRawData, SeekOrigin.Begin);
             fs.ReadExactly(textBytes.Span);
 
-            var searcherText = new WitchHuntV3(textBytes, new IntPtr(text.VirtualAddress));
+            var searcherText = new PatternSearcher(textBytes, new IntPtr(text.VirtualAddress));
 
             // Find version pointer, seek directly to it, and read only 256 bytes
             var versionResult = searcherText.Search(VersionPattern);

@@ -1,0 +1,36 @@
+﻿name: Release.yml
+on:
+    workflow_dispatch:
+    release:
+        types: [published]
+
+permissions:
+    contents: write
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Setup dotnet
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: |
+                      8.0.x
+                      10.0.x
+            - name: Build
+              run: dotnet build --nologo -v q --property WarningLevel=0 /clp:ErrorsOnly -c Release *.sln
+
+            - name: Create Nuget Package
+              run: dotnet pack -c Release --no-build --output nupkgs
+
+            - name: Release
+              uses: softprops/action-gh-release@v2
+              with:
+                files: 'nupkgs/*.nupkg'
+                make_latest: true
+
+            - name: Push nuget
+              run: dotnet nuget push "nupkgs/*.nupkg" --skip-duplicate --api-key "$NUGET_AUTH_TOKEN" --source https://api.nuget.org/v3/index.json
+              env:
+                NUGET_AUTH_TOKEN: ${{ secrets.NUGET_TOKEN }}

@@ -4,12 +4,8 @@ using System.Runtime.InteropServices;
 
 namespace Llama.Memory;
 
-public class WitchHuntV3 : ISearcher
+public class PatternSearcher : ISearcher
 {
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "StyleCop.CSharp.MaintainabilityRules",
-        "SA1401:Fields should be private",
-        Justification = "Optimization")]
     public readonly Memory<byte> Data;
 
     private const int ParallelMinDataSize = 256 * 1024;
@@ -17,39 +13,39 @@ public class WitchHuntV3 : ISearcher
 
     private readonly object _cacheLock = new();
 
-    private string[] _cachedPatternsRef;
-    private CompiledPattern[] _cachedCompiled;
-    private PatternBucketTable _cachedTable;
+    private string[]? _cachedPatternsRef;
+    private CompiledPattern[]? _cachedCompiled;
+    private PatternBucketTable? _cachedTable;
 
-    private int[] _byteFrequency;
-    private int[] _pairFrequency;
+    private int[]? _byteFrequency;
+    private int[]? _pairFrequency;
     
     
-    public WitchHuntV3(byte[] assemblyData, IntPtr imageBase)
+    public PatternSearcher(byte[] assemblyData, IntPtr imageBase)
     {
         Data = assemblyData;
         ImageBase = imageBase;
     }
 
-    public WitchHuntV3(Span<byte> assemblyData, IntPtr imageBase)
+    public PatternSearcher(Span<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData.ToArray();
         ImageBase = imageBase;
     }
 
-    public WitchHuntV3(ref ReadOnlySpan<byte> assemblyData, IntPtr imageBase)
+    public PatternSearcher(ref ReadOnlySpan<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData.ToArray();
         ImageBase = imageBase;
     }
 
-    public WitchHuntV3(ReadOnlySpan<byte> assemblyData, IntPtr imageBase)
+    public PatternSearcher(ReadOnlySpan<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData.ToArray();
         ImageBase = imageBase;
     }
 
-    public WitchHuntV3(Memory<byte> assemblyData, IntPtr imageBase)
+    public PatternSearcher(Memory<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData;
         ImageBase = imageBase;
@@ -101,7 +97,7 @@ public class WitchHuntV3 : ISearcher
         return FindMany(pattern);
     }
 
-    public IntPtr[] SearchManyPatterns(string[] patterns)
+    public IntPtr[] Search(string[] patterns)
     {
         var (compiled, table) = GetOrBuildCompiled(patterns);
         if (compiled.Length == 0)
@@ -112,7 +108,7 @@ public class WitchHuntV3 : ISearcher
         return FindManyPatternsFirstHits(compiled, table);
     }
 
-    public IntPtr[][] SearchAllPatterns(string[] patterns)
+    public IntPtr[][] SearchMany(string[] patterns)
     {
         var (compiled, table) = GetOrBuildCompiled(patterns);
         if (compiled.Length == 0)
@@ -166,7 +162,7 @@ public class WitchHuntV3 : ISearcher
         {
             if (ReferenceEquals(patterns, _cachedPatternsRef) && _cachedCompiled != null)
             {
-                return (_cachedCompiled, _cachedTable);
+                return (_cachedCompiled, _cachedTable)!;
             }
 
             var freq = GetFrequencyTables();
@@ -383,8 +379,8 @@ public class WitchHuntV3 : ISearcher
 
     private static CompiledPattern BuildCompiled(
         ParsedPattern parsed,
-        int[] byteFreq = null,
-        int[] pairFreq = null)
+        int[]? byteFreq = null,
+        int[]? pairFreq = null)
     {
         var cp = new CompiledPattern {Pattern = parsed};
 
@@ -479,11 +475,11 @@ public class WitchHuntV3 : ISearcher
     {
         public readonly Dictionary<ushort, int[]> PairBuckets;
         public readonly byte[] PairFirstBytes;
-        public readonly SearchValues<byte> PairFirstSearchValues;
+        public readonly SearchValues<byte>? PairFirstSearchValues;
 
         public readonly int[][] SingleBuckets;
         public readonly byte[] SingleAnchorBytes;
-        public readonly SearchValues<byte> SingleAnchorSearchValues;
+        public readonly SearchValues<byte>? SingleAnchorSearchValues;
 
         public readonly int[] NoAnchor;
         public readonly int MaxAnchorOffset;
@@ -722,7 +718,7 @@ public class WitchHuntV3 : ISearcher
         IntPtr[] shared,
         bool earlyExit)
     {
-        bool[] found = earlyExit ? new bool[compiled.Length] : null;
+        bool[]? found = earlyExit ? new bool[compiled.Length] : null;
         var remaining = compiled.Length;
 
         var noAnchor = table.NoAnchor;
@@ -1584,7 +1580,7 @@ public class WitchHuntV3 : ISearcher
                         throw new ArgumentException("Sub is missing its operand.");
                     }
 
-                    if (!int.TryParse(postPattern[i + 1], out var subValue))
+                    if (!TryParseOffset(postPattern[i + 1], out var subValue))
                     {
                         throw new ArgumentException($"Invalid Sub operand '{postPattern[i + 1]}'.");
                     }
