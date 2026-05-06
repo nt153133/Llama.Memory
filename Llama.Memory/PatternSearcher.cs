@@ -655,23 +655,20 @@ public class PatternSearcher : ISearcher
         var data = Data.Span;
         var dataLength = data.Length;
 
-        var shared = new IntPtr[compiled.Length];
-
         if (dataLength < ParallelMinDataSize || Environment.ProcessorCount < 2)
         {
-            FindManyPatternsFirstHits_Serial(compiled, table, data, 0, dataLength, shared, earlyExit: true);
-            return shared;
+            var serial = new FirstHitResults(compiled.Length);
+            FindManyPatternsFirstHits_Serial(compiled, table, data, 0, dataLength, serial, earlyExit: true);
+            return serial.Pointers;
         }
 
-        FindManyPatternsFirstHits_Parallel(compiled, table, dataLength, shared);
-        return shared;
+        return FindManyPatternsFirstHits_Parallel(compiled, table, dataLength);
     }
 
-    private void FindManyPatternsFirstHits_Parallel(
+    private IntPtr[] FindManyPatternsFirstHits_Parallel(
         CompiledPattern[] compiled,
         PatternBucketTable table,
-        int dataLength,
-        IntPtr[] shared)
+        int dataLength)
     {
         var procCount = Environment.ProcessorCount;
         var targetChunks = Math.Max(
@@ -691,12 +688,14 @@ public class PatternSearcher : ISearcher
 
         var overlap = Math.Max(1, maxPatternLen);
         var dataMemory = Data;
+        var chunkResults = new FirstHitResults[targetChunks];
 
         Parallel.For(0, targetChunks, chunkIdx =>
         {
             var start = chunkIdx * chunkSize;
             var end = Math.Min(start + chunkSize + overlap, dataLength);
             var span = dataMemory.Span;
+            var local = new FirstHitResults(compiled.Length);
 
             FindManyPatternsFirstHits_Serial(
                 compiled,
@@ -704,9 +703,32 @@ public class PatternSearcher : ISearcher
                 span,
                 start,
                 end,
-                shared,
+                local,
                 earlyExit: false);
+
+            chunkResults[chunkIdx] = local;
         });
+
+        var final = new FirstHitResults(compiled.Length);
+
+        for (var c = 0; c < chunkResults.Length; c++)
+        {
+            var local = chunkResults[c];
+
+            for (var p = 0; p < compiled.Length; p++)
+            {
+                var rawOffset = local.RawOffsets[p];
+
+                if (rawOffset == int.MaxValue)
+                {
+                    continue;
+                }
+
+                TryPublishEarliestHit(final, p, rawOffset, local.Pointers[p]);
+            }
+        }
+
+        return final.Pointers;
     }
 
     private void FindManyPatternsFirstHits_Serial(
@@ -715,7 +737,7 @@ public class PatternSearcher : ISearcher
         ReadOnlySpan<byte> data,
         int rangeStart,
         int rangeEnd,
-        IntPtr[] shared,
+        FirstHitResults results,
         bool earlyExit)
     {
         bool[]? found = earlyExit ? new bool[compiled.Length] : null;
@@ -746,7 +768,7 @@ public class PatternSearcher : ISearcher
                         MatchAtRaw(data, pos, cp.Pattern.BytesToSearch, cp.Pattern.Mask, len))
                     {
                         var finalPtr = ApplyPostPattern(in cp.Pattern, new IntPtr(pos), data);
-                        if (TryPublishEarliestHit(shared, idx, finalPtr) && earlyExit)
+                        if (TryPublishEarliestHit(results, idx, pos, finalPtr) && earlyExit)
                         {
                             found[idx] = true;
                             remaining--;
@@ -831,7 +853,7 @@ public class PatternSearcher : ISearcher
                         }
 
                         var finalPtr = ApplyPostPattern(in cp.Pattern, new IntPtr(start), data);
-                        if (TryPublishEarliestHit(shared, idx, finalPtr) && earlyExit)
+                        if (TryPublishEarliestHit(results, idx, start, finalPtr) && earlyExit)
                         {
                             found[idx] = true;
                             remaining--;
@@ -912,7 +934,7 @@ public class PatternSearcher : ISearcher
                         }
 
                         var finalPtr = ApplyPostPattern(in cp.Pattern, new IntPtr(start), data);
-                        if (TryPublishEarliestHit(shared, idx, finalPtr) && earlyExit)
+                        if (TryPublishEarliestHit(results, idx, start, finalPtr) && earlyExit)
                         {
                             found[idx] = true;
                             remaining--;
@@ -931,26 +953,29 @@ public class PatternSearcher : ISearcher
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryPublishEarliestHit(IntPtr[] shared, int idx, IntPtr candidate)
+    private static bool TryPublishEarliestHit(FirstHitResults results, int idx, int rawOffset, IntPtr pointer)
     {
-        var candidateLong = candidate.ToInt64();
-        ref var slot = ref Unsafe.As<IntPtr, long>(ref shared[idx]);
-
-        while (true)
+        if (rawOffset >= results.RawOffsets[idx])
         {
-            var currentLong = Volatile.Read(ref slot);
-
-            if (currentLong != 0 && currentLong <= candidateLong)
-            {
-                return false;
-            }
-
-            var prev = Interlocked.CompareExchange(ref slot, candidateLong, currentLong);
-            if (prev == currentLong)
-            {
-                return true;
-            }
+            return false;
         }
+
+        results.RawOffsets[idx] = rawOffset;
+        results.Pointers[idx] = pointer;
+        return true;
+    }
+
+    private sealed class FirstHitResults
+    {
+        public FirstHitResults(int length)
+        {
+            RawOffsets = new int[length];
+            Pointers = new IntPtr[length];
+            Array.Fill(RawOffsets, int.MaxValue);
+        }
+
+        public int[] RawOffsets { get; }
+        public IntPtr[] Pointers { get; }
     }
 
     private IntPtr[][] FindAllPatternHits(CompiledPattern[] compiled, PatternBucketTable table)
