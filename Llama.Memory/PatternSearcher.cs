@@ -320,21 +320,22 @@ public class PatternSearcher : ISearcher
 
         while (true)
         {
-            var result = FindSingle(in compiled, new IntPtr(offset), dataLength - offset);
-            if (result == IntPtr.Zero)
+            var rawOffset = FindSingleRawOffset(in compiled, new IntPtr(offset), dataLength - offset);
+            if (rawOffset < 0)
             {
                 break;
             }
 
+            var result = ApplyPostPattern(in compiled.Pattern, new IntPtr(rawOffset), Data.Span);
             final.Add(result);
 
-            var rawOffset = (int)(result.ToInt64() - ImageBase.ToInt64()) + compiled.Pattern.BytesLength;
-            if (rawOffset >= dataLength || rawOffset <= offset)
+            var nextOffset = rawOffset + compiled.Pattern.BytesLength;
+            if (nextOffset >= dataLength || nextOffset <= offset)
             {
                 break;
             }
 
-            offset = rawOffset;
+            offset = nextOffset;
         }
 
         return final.ToArray();
@@ -1382,9 +1383,20 @@ public class PatternSearcher : ISearcher
 
     private IntPtr FindSingle(in CompiledPattern compiledPattern, IntPtr start, int max)
     {
-        if (max <= 0)
+        var matchingIndex = FindSingleRawOffset(in compiledPattern, start, max);
+        if (matchingIndex < 0)
         {
             return IntPtr.Zero;
+        }
+
+        return ApplyPostPattern(in compiledPattern.Pattern, new IntPtr(matchingIndex), Data.Span);
+    }
+
+    private int FindSingleRawOffset(in CompiledPattern compiledPattern, IntPtr start, int max)
+    {
+        if (max <= 0)
+        {
+            return -1;
         }
 
         var parsedPattern = compiledPattern.Pattern;
@@ -1392,7 +1404,7 @@ public class PatternSearcher : ISearcher
 
         if (start64 < 0 || start64 > int.MaxValue)
         {
-            return IntPtr.Zero;
+            return -1;
         }
 
         var startInt = (int)start64;
@@ -1423,7 +1435,7 @@ public class PatternSearcher : ISearcher
 
         if (searchEnd < index)
         {
-            return IntPtr.Zero;
+            return -1;
         }
 
         var matchingIndex = -1;
@@ -1541,10 +1553,10 @@ public class PatternSearcher : ISearcher
 
         if (matchingIndex < 0)
         {
-            return IntPtr.Zero;
+            return -1;
         }
 
-        return ApplyPostPattern(in parsedPattern, new IntPtr(matchingIndex), data);
+        return matchingIndex;
     }
 
     private IntPtr ApplyPostPattern(
