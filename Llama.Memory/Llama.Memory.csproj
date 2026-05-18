@@ -18,7 +18,7 @@
         <PackageTags>memory-scanner, pattern-searcher, sigscan, pe-parser, portable-executable, reverse-engineering, binary-analysis, simd</PackageTags>
         <Description>Llama.Memory is a lightweight byte-pattern scanning and PE header utility library for .NET.</Description>
         <Company>LlamaMagic</Company>
-        <Version>1.0.2</Version>
+        <Version>1.0.3</Version>
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 

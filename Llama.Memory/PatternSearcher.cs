@@ -207,12 +207,16 @@ public class PatternSearcher : ISearcher
     {
         parsedPattern = default;
 
+        if (pattern == null)
+        {
+            throw new ArgumentNullException(nameof(pattern));
+        }
+
         var scratchLen = (pattern.Length / 2) + 1;
         var bytesScratch = ArrayPool<byte>.Shared.Rent(scratchLen);
         var maskScratch = ArrayPool<byte>.Shared.Rent(scratchLen);
         List<string> post = null;
         var length = 0;
-        var ok = true;
 
         try
         {
@@ -229,24 +233,15 @@ public class PatternSearcher : ISearcher
                     continue;
                 }
 
-                if (curLen == 6)
+                if (cur.Equals("Search", StringComparison.OrdinalIgnoreCase))
                 {
-                    var c0 = cur[0];
-                    if (c0 == 'S' || c0 == 's')
-                    {
-                        continue;
-                    }
+                    continue;
                 }
 
-                if (curLen > 2)
+                if (!IsPatternByteToken(cur))
                 {
                     post = new List<string>(4);
-                    break;
-                }
-
-                if (!cur.IsValidHex())
-                {
-                    ok = false;
+                    post.Add(new string(cur));
                     break;
                 }
 
@@ -255,18 +250,23 @@ public class PatternSearcher : ISearcher
                 length++;
             }
 
-            if (ok && post != null && enumerator.WordPos <= enumerator.Input.Length + 1)
+            if (post != null && enumerator.WordPos <= enumerator.Input.Length + 1)
             {
-                post.Add(new string(enumerator.Current));
                 while (enumerator.MoveNext())
                 {
-                    post.Add(new string(enumerator.Current));
+                    var cur = enumerator.Current;
+                    if (cur.Length != 0)
+                    {
+                        post.Add(new string(cur));
+                    }
                 }
+
+                ValidatePostPattern(post, pattern);
             }
 
-            if (!ok || length == 0)
+            if (length == 0)
             {
-                return false;
+                throw new ArgumentException("Pattern must contain at least one byte token.", nameof(pattern));
             }
 
             var bytes = new byte[length];
@@ -301,6 +301,65 @@ public class PatternSearcher : ISearcher
         {
             ArrayPool<byte>.Shared.Return(bytesScratch);
             ArrayPool<byte>.Shared.Return(maskScratch);
+        }
+    }
+
+    private static bool IsPatternByteToken(ReadOnlySpan<char> token)
+    {
+        if (token is ['?'] or ['?', '?'])
+        {
+            return true;
+        }
+
+        return token.Length == 2 && token.IsValidHex();
+    }
+
+    private static void ValidatePostPattern(List<string> postPattern, string pattern)
+    {
+        for (var i = 0; i < postPattern.Count; i++)
+        {
+            var token = postPattern[i];
+
+            if (!Enum.TryParse<Keywords>(token, true, out var keyword))
+            {
+                throw new ArgumentException(
+                    $"Unknown post-match command '{token}' in pattern '{pattern}'. Commands must be separated from byte tokens by whitespace.",
+                    nameof(pattern));
+            }
+
+            switch (keyword)
+            {
+                case Keywords.Add:
+                case Keywords.Sub:
+                    if (i + 1 >= postPattern.Count)
+                    {
+                        throw new ArgumentException(
+                            $"{token} is missing its operand in pattern '{pattern}'.",
+                            nameof(pattern));
+                    }
+
+                    var operand = postPattern[i + 1];
+                    if (!TryParseOffset(operand, out _))
+                    {
+                        throw new ArgumentException(
+                            $"Invalid {token} operand '{operand}' in pattern '{pattern}'.",
+                            nameof(pattern));
+                    }
+
+                    i++;
+                    break;
+
+                case Keywords.Read8:
+                case Keywords.Read16:
+                case Keywords.Read32:
+                case Keywords.Read64:
+                case Keywords.Tracerelative:
+                case Keywords.Tracecall:
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
     }
 
