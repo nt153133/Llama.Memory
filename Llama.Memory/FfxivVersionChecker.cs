@@ -123,7 +123,7 @@ public static class FfxivVersionChecker
         {
             // 🚀 SIMD-accelerated search
             int revIndex = version.IndexOf(revMarker);
-        
+
             // If "rev" isn't found, or it's too close to the end to be valid
             if (revIndex < 0 || revIndex > version.Length - 5)
                 break;

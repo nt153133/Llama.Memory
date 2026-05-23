@@ -7,7 +7,7 @@ public readonly ref struct CharSpanSplitter
     private readonly ReadOnlySpan<char> input;
 
     public CharSpanSplitter(ReadOnlySpan<char> input) => this.input = input;
-        
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Enumerator GetEnumerator() => new Enumerator(input);
 
@@ -42,7 +42,7 @@ public readonly ref struct CharSpanSplitter
             return false;
         }
     }
-        
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsWhiteSpace(char c)
     {

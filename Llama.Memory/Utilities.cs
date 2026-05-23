@@ -18,11 +18,11 @@ public static class Utilities
         if (tok.Length <= 1)
             return 0;
 
-        bool firstIsWild  = WildcardValues.Contains(tok[0]);
+        bool firstIsWild = WildcardValues.Contains(tok[0]);
         bool secondIsWild = WildcardValues.Contains(tok[1]);
 
-        if (firstIsWild  && secondIsWild) return 0x00;
-        if (firstIsWild  && !secondIsWild) return 0x0F;
+        if (firstIsWild && secondIsWild) return 0x00;
+        if (firstIsWild && !secondIsWild) return 0x0F;
         if (!firstIsWild && secondIsWild) return 0xF0;
 
         return 0xFF;
