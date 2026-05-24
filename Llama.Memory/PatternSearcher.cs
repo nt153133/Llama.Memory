@@ -19,8 +19,8 @@ public class PatternSearcher : ISearcher
 
     private int[]? _byteFrequency;
     private int[]? _pairFrequency;
-    
-    
+
+
     public PatternSearcher(byte[] assemblyData, IntPtr imageBase)
     {
         Data = assemblyData;
@@ -139,15 +139,26 @@ public class PatternSearcher : ISearcher
 
         var data = Data.Span;
 
-        for (var i = 0; i < data.Length; i++)
+        if (data.Length > 0)
         {
-            byteFreq[data[i]]++;
-        }
+            ref byte current = ref MemoryMarshal.GetReference(data);
+            ref int byteFreqRef = ref MemoryMarshal.GetArrayDataReference(byteFreq);
+            ref int pairFreqRef = ref MemoryMarshal.GetArrayDataReference(pairFreq);
+            int len = data.Length;
 
-        for (var i = 0; i + 1 < data.Length; i++)
-        {
-            var pair = data[i] | (data[i + 1] << 8);
-            pairFreq[pair]++;
+            byte prevByte = current;
+            Unsafe.Add(ref byteFreqRef, prevByte)++;
+
+            for (int i = 1; i < len; i++)
+            {
+                byte currByte = Unsafe.Add(ref current, i);
+                Unsafe.Add(ref byteFreqRef, currByte)++;
+
+                int pair = prevByte | (currByte << 8);
+                Unsafe.Add(ref pairFreqRef, pair)++;
+
+                prevByte = currByte;
+            }
         }
 
         Volatile.Write(ref _pairFrequency, pairFreq);
@@ -442,7 +453,7 @@ public class PatternSearcher : ISearcher
         int[]? byteFreq = null,
         int[]? pairFreq = null)
     {
-        var cp = new CompiledPattern {Pattern = parsed};
+        var cp = new CompiledPattern { Pattern = parsed };
 
         var bestPairIdx = -1;
         ushort bestPair = 0;
@@ -1650,40 +1661,40 @@ public class PatternSearcher : ISearcher
             switch (keyword)
             {
                 case Keywords.Add:
-                {
-                    if (i + 1 >= postPatternLength)
                     {
-                        throw new ArgumentException("Add is missing its operand.");
+                        if (i + 1 >= postPatternLength)
+                        {
+                            throw new ArgumentException("Add is missing its operand.");
+                        }
+
+                        var next = postPattern[i + 1];
+
+                        if (!TryParseOffset(next, out var addValue))
+                        {
+                            throw new ArgumentException($"Invalid Add operand '{next}'.");
+                        }
+
+                        i++;
+                        resultPointer += addValue;
+                        break;
                     }
-
-                    var next = postPattern[i + 1];
-
-                    if (!TryParseOffset(next, out var addValue))
-                    {
-                        throw new ArgumentException($"Invalid Add operand '{next}'.");
-                    }
-
-                    i++;
-                    resultPointer += addValue;
-                    break;
-                }
 
                 case Keywords.Sub:
-                {
-                    if (i + 1 >= postPatternLength)
                     {
-                        throw new ArgumentException("Sub is missing its operand.");
-                    }
+                        if (i + 1 >= postPatternLength)
+                        {
+                            throw new ArgumentException("Sub is missing its operand.");
+                        }
 
-                    if (!TryParseOffset(postPattern[i + 1], out var subValue))
-                    {
-                        throw new ArgumentException($"Invalid Sub operand '{postPattern[i + 1]}'.");
-                    }
+                        if (!TryParseOffset(postPattern[i + 1], out var subValue))
+                        {
+                            throw new ArgumentException($"Invalid Sub operand '{postPattern[i + 1]}'.");
+                        }
 
-                    i++;
-                    resultPointer -= subValue;
-                    break;
-                }
+                        i++;
+                        resultPointer -= subValue;
+                        break;
+                    }
 
                 case Keywords.Read8:
                     return new IntPtr(data[resultPointer.ToInt32()]);

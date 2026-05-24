@@ -1,0 +1,3 @@
+## 2024-05-24 - [Optimize GetFrequencyTables]
+**Learning:** `GetFrequencyTables` in `PatternSearcher.cs` builds byte and pair frequency tables on the first Search. The original approach iterated through the data span twice (once for bytes, once for pairs) causing unnecessary memory reads. Even worse, the array bound checks weren't elided.
+**Action:** Used `MemoryMarshal.GetReference`, `MemoryMarshal.GetArrayDataReference`, and `Unsafe.Add` to create a fast path that populates both the byte frequency and pair frequency arrays in a single, bounds-check-free pass. Combining the passes and bypassing bounds checks reduced the time from 5.5s down to 1.9s for a 100MB array (over 10 iterations) and 565ms to 191ms for a single iteration.

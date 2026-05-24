@@ -13,7 +13,7 @@ public sealed unsafe class UnmanagedMemoryManager<T> : MemoryManager<T> where T 
     public UnmanagedMemoryManager(T* pointer, int length)
     {
         if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
-            
+
         _pointer = pointer;
         _length = length;
     }
