@@ -1388,7 +1388,9 @@ public class PatternSearcher : ISearcher
         ulong dataWord;
         ref var dRef = ref Unsafe.Add(ref MemoryMarshal.GetReference(data), index);
 
-        if (prefLen == 8)
+        // If we have at least 8 bytes left in the buffer, we can safely perform a single 64-bit unaligned read.
+        // The PrefixMask naturally ignores any trailing garbage bytes beyond prefLen.
+        if ((uint)index + 8 <= (uint)data.Length)
         {
             dataWord = Unsafe.ReadUnaligned<ulong>(ref dRef);
         }

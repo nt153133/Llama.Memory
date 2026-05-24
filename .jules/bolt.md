@@ -1,3 +1,7 @@
 ## 2024-05-24 - [Optimize GetFrequencyTables]
 **Learning:** `GetFrequencyTables` in `PatternSearcher.cs` builds byte and pair frequency tables on the first Search. The original approach iterated through the data span twice (once for bytes, once for pairs) causing unnecessary memory reads. Even worse, the array bound checks weren't elided.
 **Action:** Used `MemoryMarshal.GetReference`, `MemoryMarshal.GetArrayDataReference`, and `Unsafe.Add` to create a fast path that populates both the byte frequency and pair frequency arrays in a single, bounds-check-free pass. Combining the passes and bypassing bounds checks reduced the time from 5.5s down to 1.9s for a 100MB array (over 10 iterations) and 565ms to 191ms for a single iteration.
+
+## 2024-05-25 - [Optimize PrefixReject fast-path]
+**Learning:** `PrefixReject` had a slow loop that built a `ulong` byte-by-byte for patterns where `prefLen` < 8. The loop can be safely bypassed if there are at least 8 bytes left in the buffer (`index + 8 <= data.Length`), by doing an 8-byte unaligned read. The `PrefixMask` naturally zeros out trailing garbage bytes beyond the pattern's `prefLen`.
+**Action:** When performing `PrefixReject` or any bitwise prefix checking using unaligned memory reads, always check if we can read 8 bytes first, regardless of the pattern length, and rely on the mask to filter out irrelevant bytes. This resulted in a ~3x speedup on `PrefixReject` logic.
