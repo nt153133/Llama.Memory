@@ -1385,24 +1385,23 @@ public class PatternSearcher : ISearcher
             return true;
         }
 
-        ulong dataWord;
         ref var dRef = ref Unsafe.Add(ref MemoryMarshal.GetReference(data), index);
 
-        if (prefLen == 8)
+        // Fast path: if there are at least 8 bytes available, read directly.
+        // We know that cp.PrefixMask ignores bytes beyond cp.PrefixLength.
+        if ((uint)index + 8u <= (uint)data.Length)
         {
-            dataWord = Unsafe.ReadUnaligned<ulong>(ref dRef);
-        }
-        else
-        {
-            dataWord = 0;
-
-            for (var i = 0; i < prefLen; i++)
-            {
-                dataWord |= (ulong)Unsafe.Add(ref dRef, i) << (i * 8);
-            }
+            ulong dataWord = Unsafe.ReadUnaligned<ulong>(ref dRef);
+            return ((dataWord ^ cp.PrefixBytes) & cp.PrefixMask) != 0;
         }
 
-        return ((dataWord ^ cp.PrefixBytes) & cp.PrefixMask) != 0;
+        // Slow path: near the end of the data, read byte by byte
+        ulong slowDataWord = 0;
+        for (var i = 0; i < prefLen; i++)
+        {
+            slowDataWord |= (ulong)Unsafe.Add(ref dRef, i) << (i * 8);
+        }
+        return ((slowDataWord ^ cp.PrefixBytes) & cp.PrefixMask) != 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
