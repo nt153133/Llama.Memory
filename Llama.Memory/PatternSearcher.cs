@@ -1385,17 +1385,16 @@ public class PatternSearcher : ISearcher
             return true;
         }
 
-        ulong dataWord;
         ref var dRef = ref Unsafe.Add(ref MemoryMarshal.GetReference(data), index);
+        ulong dataWord;
 
-        if (prefLen == 8)
+        if ((uint)index + 8 <= (uint)data.Length)
         {
             dataWord = Unsafe.ReadUnaligned<ulong>(ref dRef);
         }
         else
         {
             dataWord = 0;
-
             for (var i = 0; i < prefLen; i++)
             {
                 dataWord |= (ulong)Unsafe.Add(ref dRef, i) << (i * 8);
@@ -1438,7 +1437,33 @@ public class PatternSearcher : ISearcher
             i += 8;
         }
 
-        for (; i < len; i++)
+        if (i + 4 <= len)
+        {
+            var dW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref dRef, i));
+            var pW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref pRef, i));
+            var mW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref mRef, i));
+
+            if (((dW ^ pW) & mW) != 0)
+            {
+                return false;
+            }
+            i += 4;
+        }
+
+        if (i + 2 <= len)
+        {
+            var dW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref dRef, i));
+            var pW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref pRef, i));
+            var mW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref mRef, i));
+
+            if (((dW ^ pW) & mW) != 0)
+            {
+                return false;
+            }
+            i += 2;
+        }
+
+        if (i < len)
         {
             var m = Unsafe.Add(ref mRef, i);
 
@@ -1780,7 +1805,33 @@ public class PatternSearcher : ISearcher
             i += 8;
         }
 
-        for (; i < len; i++)
+        if (i + 4 <= len)
+        {
+            var dW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref dRef, i));
+            var pW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref pRef, i));
+            var mW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref mRef, i));
+
+            if (((dW ^ pW) & mW) != 0)
+            {
+                return false;
+            }
+            i += 4;
+        }
+
+        if (i + 2 <= len)
+        {
+            var dW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref dRef, i));
+            var pW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref pRef, i));
+            var mW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref mRef, i));
+
+            if (((dW ^ pW) & mW) != 0)
+            {
+                return false;
+            }
+            i += 2;
+        }
+
+        if (i < len)
         {
             var m = Unsafe.Add(ref mRef, i);
 
@@ -1807,16 +1858,65 @@ public class PatternSearcher : ISearcher
 
         var dataBuffer = data.Slice(index, bytesToMatch.Length);
 
-        int i;
-        for (i = 0; i < bytesToMatch.Length; i++)
+        var len = bytesToMatch.Length;
+        var i = 0;
+        ref var dRef = ref MemoryMarshal.GetReference(dataBuffer);
+        ref var pRef = ref MemoryMarshal.GetReference(bytesToMatch);
+        ref var mRef = ref MemoryMarshal.GetReference(masks);
+
+        while (i + 8 <= len)
         {
-            if (((dataBuffer[i] ^ bytesToMatch[i]) & masks[i]) != 0)
+            var dW = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref dRef, i));
+            var pW = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref pRef, i));
+            var mW = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref mRef, i));
+
+            if (((dW ^ pW) & mW) != 0)
             {
                 break;
             }
+
+            i += 8;
         }
 
-        if (i == bytesToMatch.Length)
+        if (i + 4 <= len)
+        {
+            var dW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref dRef, i));
+            var pW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref pRef, i));
+            var mW = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref mRef, i));
+
+            if (((dW ^ pW) & mW) == 0)
+            {
+                i += 4;
+            }
+        }
+
+        if (i + 2 <= len)
+        {
+            var dW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref dRef, i));
+            var pW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref pRef, i));
+            var mW = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref mRef, i));
+
+            if (((dW ^ pW) & mW) == 0)
+            {
+                i += 2;
+            }
+        }
+
+        if (i < len)
+        {
+            var m = Unsafe.Add(ref mRef, i);
+
+            if (((Unsafe.Add(ref dRef, i) ^ Unsafe.Add(ref pRef, i)) & m) != 0)
+            {
+                // Fallthrough to break
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        if (i == len)
         {
             return 1;
         }
