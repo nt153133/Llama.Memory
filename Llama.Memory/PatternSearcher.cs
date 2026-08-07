@@ -1388,7 +1388,7 @@ public class PatternSearcher : ISearcher
         ulong dataWord;
         ref var dRef = ref Unsafe.Add(ref MemoryMarshal.GetReference(data), index);
 
-        if (prefLen == 8)
+        if ((uint)index + sizeof(ulong) <= (uint)data.Length)
         {
             dataWord = Unsafe.ReadUnaligned<ulong>(ref dRef);
         }
