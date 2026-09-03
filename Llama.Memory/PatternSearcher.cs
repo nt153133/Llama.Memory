@@ -1,11 +1,17 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Llama.Memory;
 
+/// <summary>
+/// A high-performance byte-pattern scanner that searches memory buffers using SIMD acceleration and frequency-table heuristics.
+/// </summary>
 public class PatternSearcher : ISearcher
 {
+    /// <summary>
+    /// The underlying memory region being scanned.
+    /// </summary>
     public readonly Memory<byte> Data;
 
     private const int ParallelMinDataSize = 256 * 1024;
@@ -21,30 +27,55 @@ public class PatternSearcher : ISearcher
     private int[]? _pairFrequency;
 
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PatternSearcher"/> class wrapping the specified byte array.
+    /// </summary>
+    /// <param name="assemblyData">The byte array containing the memory image to search.</param>
+    /// <param name="imageBase">The virtual base address (image base) to add to match offsets.</param>
     public PatternSearcher(byte[] assemblyData, IntPtr imageBase)
     {
         Data = assemblyData;
         ImageBase = imageBase;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PatternSearcher"/> class from a copy of the specified byte span.
+    /// </summary>
+    /// <param name="assemblyData">The byte span containing the data to search.</param>
+    /// <param name="imageBase">The virtual base address (image base) to add to match offsets.</param>
     public PatternSearcher(Span<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData.ToArray();
         ImageBase = imageBase;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PatternSearcher"/> class from a copy of the specified read-only byte span reference.
+    /// </summary>
+    /// <param name="assemblyData">A reference to the read-only byte span containing the data to search.</param>
+    /// <param name="imageBase">The virtual base address (image base) to add to match offsets.</param>
     public PatternSearcher(ref ReadOnlySpan<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData.ToArray();
         ImageBase = imageBase;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PatternSearcher"/> class from a copy of the specified read-only byte span.
+    /// </summary>
+    /// <param name="assemblyData">The read-only byte span containing the data to search.</param>
+    /// <param name="imageBase">The virtual base address (image base) to add to match offsets.</param>
     public PatternSearcher(ReadOnlySpan<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData.ToArray();
         ImageBase = imageBase;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PatternSearcher"/> class wrapping the specified <see cref="Memory{T}"/>.
+    /// </summary>
+    /// <param name="assemblyData">The memory block containing the data to search.</param>
+    /// <param name="imageBase">The virtual base address (image base) to add to match offsets.</param>
     public PatternSearcher(Memory<byte> assemblyData, IntPtr imageBase)
     {
         Data = assemblyData;
@@ -64,8 +95,10 @@ public class PatternSearcher : ISearcher
         Tracecall,
     }
 
+    /// <inheritdoc />
     public IntPtr ImageBase { get; }
 
+    /// <inheritdoc />
     public IntPtr Search(string pattern)
     {
         if (!GetPatternBytes(pattern, out var parsedPattern))
@@ -79,6 +112,7 @@ public class PatternSearcher : ISearcher
         return FindSingle(in compiled, IntPtr.Zero, Data.Length);
     }
 
+    /// <inheritdoc />
     public IntPtr Search(string pattern, IntPtr start, int maxSearchLength)
     {
         if (!GetPatternBytes(pattern, out var parsedPattern))
@@ -92,11 +126,13 @@ public class PatternSearcher : ISearcher
         return FindSingle(in compiled, start, maxSearchLength);
     }
 
+    /// <inheritdoc />
     public IntPtr[] SearchMany(string pattern)
     {
         return FindMany(pattern);
     }
 
+    /// <inheritdoc />
     public IntPtr[] Search(string[] patterns)
     {
         var (compiled, table) = GetOrBuildCompiled(patterns);
@@ -108,6 +144,7 @@ public class PatternSearcher : ISearcher
         return FindManyPatternsFirstHits(compiled, table);
     }
 
+    /// <inheritdoc />
     public IntPtr[][] SearchMany(string[] patterns)
     {
         var (compiled, table) = GetOrBuildCompiled(patterns);
@@ -119,6 +156,12 @@ public class PatternSearcher : ISearcher
         return FindAllPatternHits(compiled, table);
     }
 
+    /// <summary>
+    /// Retrieves a read-only span slice from the underlying memory data buffer.
+    /// </summary>
+    /// <param name="start">The zero-based start index of the slice.</param>
+    /// <param name="length">The number of bytes in the slice.</param>
+    /// <returns>A <see cref="ReadOnlySpan{T}"/> covering the requested range.</returns>
     public ReadOnlySpan<byte> GetSlice(int start, int length)
     {
         return Data.Span.Slice(start, length);
@@ -167,7 +210,7 @@ public class PatternSearcher : ISearcher
         return (byteFreq, pairFreq);
     }
 
-    private (CompiledPattern[] Compiled, PatternBucketTable Table) GetOrBuildCompiled(string[] patterns)
+    private (CompiledPattern[] Compiled, PatternBucketTable? Table) GetOrBuildCompiled(string[] patterns)
     {
         lock (_cacheLock)
         {

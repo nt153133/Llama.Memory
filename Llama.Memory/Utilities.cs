@@ -1,8 +1,11 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace Llama.Memory;
 
+/// <summary>
+/// Provides utility methods for parsing, validating, and converting hexadecimal and pattern tokens.
+/// </summary>
 public static class Utilities
 {
     private const string Wildcards = "?";
@@ -13,6 +16,14 @@ public static class Utilities
 
     private static readonly SearchValues<char> HexValues = SearchValues.Create(Hexchars);
 
+    /// <summary>
+    /// Computes the bitmask corresponding to a 2-character hex or wildcard pattern token.
+    /// </summary>
+    /// <param name="tok">The 2-character pattern token span.</param>
+    /// <returns>
+    /// A byte mask where <c>0xFF</c> indicates exact byte match, <c>0x00</c> indicates full wildcard,
+    /// <c>0x0F</c> indicates low-nibble match, and <c>0xF0</c> indicates high-nibble match.
+    /// </returns>
     public static byte GetMask(this ReadOnlySpan<char> tok)
     {
         if (tok.Length <= 1)
@@ -28,6 +39,11 @@ public static class Utilities
         return 0xFF;
     }
 
+    /// <summary>
+    /// Validates whether the character span consists entirely of valid hexadecimal digits or wildcard characters.
+    /// </summary>
+    /// <param name="str">The character span to validate.</param>
+    /// <returns><see langword="true"/> if all characters are valid hex digits or wildcards and length is &lt;= 16; otherwise, <see langword="false"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsValidHex(this ReadOnlySpan<char> str)
     {
@@ -41,6 +57,7 @@ public static class Utilities
     /// <summary>
     /// Returns the value of the given hex digit character.
     /// </summary>
+    /// <param name="c">The character to evaluate.</param>
     /// <returns>Value of char as hex.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int HexValueOf(this char c)
@@ -67,6 +84,7 @@ public static class Utilities
     /// Returns the byte value to be used for the given hex bytes.  Handles wildcard
     /// characters by return treating them as 0s.
     /// </summary>
+    /// <param name="tok">The character span representing hex digits or wildcards.</param>
     /// <returns>Byte value of the string.</returns>
     public static byte GetByte(this ReadOnlySpan<char> tok)
     {

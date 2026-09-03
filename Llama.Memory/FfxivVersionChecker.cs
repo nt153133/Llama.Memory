@@ -4,6 +4,9 @@ using System.Text;
 
 namespace Llama.Memory;
 
+/// <summary>
+/// Provides utility methods for extracting version and build date metadata from an FFXIV client executable.
+/// </summary>
 public static class FfxivVersionChecker
 {
     private const string VersionPattern = "48 8D 3D ? ? ? ? 74 ? Add 3 TraceRelative Add 10";
@@ -64,7 +67,24 @@ public static class FfxivVersionChecker
         return ParseVersion(dataBytesForVersion);
     }
 
-
+    /// <summary>
+    /// Reads the FFXIV client executable and locates the version marker using a byte-pattern scan in the <c>.text</c> section.
+    /// </summary>
+    /// <param name="ffxivExe">The target <c>ffxiv_dx11.exe</c> file to inspect.</param>
+    /// <returns>
+    /// A tuple containing:
+    /// <list type="bullet">
+    /// <item><description><c>Version</c>: the numeric revision parsed from <c>rev{number}_{date}_</c>.</description></item>
+    /// <item><description><c>Date</c>: the date/token segment parsed from the same version marker.</description></item>
+    /// </list>
+    /// Returns <c>("0", "0")</c> when the file does not exist, when PE headers are invalid, or when the expected marker is not found/parsable.
+    /// </returns>
+    /// <remarks>
+    /// This method is fully synchronous and performs blocking file I/O.
+    /// </remarks>
+    /// <exception cref="FileNotFoundException">The executable file was not found.</exception>
+    /// <exception cref="InvalidDataException">The executable contains fewer than 3 PE sections.</exception>
+    /// <exception cref="IOException">An I/O error occurs while reading the executable.</exception>
     public static (string Version, string Date) GetVersionPattern(FileInfo ffxivExe)
     {
         if (!ffxivExe.Exists)

@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -22,10 +22,26 @@ public record PeHeaderInfo(
     ulong ImageBase,
     SimpleSectionHeader[] Sections)
 {
-    //indexer
+    /// <summary>
+    /// Gets the <see cref="SimpleSectionHeader"/> at the specified section index.
+    /// </summary>
+    /// <param name="index">The zero-based index of the section.</param>
+    /// <returns>The section header at the specified index.</returns>
     public SimpleSectionHeader this[int index] => Sections[index];
+
+    /// <summary>
+    /// Gets the first section named <c>.text</c>, or <see langword="null"/> if not found.
+    /// </summary>
     public SimpleSectionHeader? TextSection => Sections.FirstOrDefault(s => s.Name.Equals(".text"));
+
+    /// <summary>
+    /// Gets the first section named <c>.rdata</c>, or <see langword="null"/> if not found.
+    /// </summary>
     public SimpleSectionHeader? RdataSection => Sections.FirstOrDefault(s => s.Name.Equals(".rdata"));
+
+    /// <summary>
+    /// Gets the first section named <c>.data</c>, or <see langword="null"/> if not found.
+    /// </summary>
     public SimpleSectionHeader? DataSection => Sections.FirstOrDefault(s => s.Name.Equals(".data"));
 }
 
@@ -257,6 +273,13 @@ public static class PeHeaderParser
         }
     }
 
+    /// <summary>
+    /// Converts a Relative Virtual Address (RVA) to a raw file offset based on the provided section headers.
+    /// </summary>
+    /// <param name="rva">The relative virtual address to convert.</param>
+    /// <param name="sections">The array of section headers to resolve the RVA against.</param>
+    /// <returns>The file offset corresponding to the given RVA.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="rva"/> does not fall within any of the provided sections.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint RvaToFileOffset(uint rva, SimpleSectionHeader[] sections)
     {

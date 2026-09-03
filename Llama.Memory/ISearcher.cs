@@ -1,4 +1,4 @@
-﻿namespace Llama.Memory;
+namespace Llama.Memory;
 
 /// <summary>
 /// Defines the contract for a byte-pattern scanner that operates over a contiguous region of
@@ -185,7 +185,7 @@ public interface ISearcher
     /// </summary>
     /// <param name="patterns">
     /// A non-null array of pattern strings. Each element must follow the same syntax as the
-    /// <paramref name="pattern"/> parameter of <see cref="Search(string)"/>.
+    /// <c>pattern</c> parameter of <see cref="Search(string)"/>.
     /// Duplicate entries are permitted and are treated as independent searches — each will
     /// produce its own result slot.
     /// An empty array is valid and produces an empty result array.
@@ -220,7 +220,7 @@ public interface ISearcher
     /// </summary>
     /// <param name="patterns">
     /// A non-null array of pattern strings. Each element must follow the same syntax as the
-    /// <paramref name="pattern"/> parameter of <see cref="Search(string)"/>.
+    /// <c>pattern</c> parameter of <see cref="Search(string)"/>.
     /// Duplicate entries are permitted and produce independent hit lists.
     /// An empty array is valid and produces an empty jagged result array.
     /// </param>

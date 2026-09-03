@@ -2,8 +2,14 @@ using System;
 using System.Diagnostics;
 using Llama.Memory;
 
+/// <summary>
+/// Provides entry point and benchmarks for pattern scanning operations.
+/// </summary>
 public class Benchmark
 {
+    /// <summary>
+    /// Executes the benchmark run.
+    /// </summary>
     public static void Main()
     {
         var data = new byte[10 * 1024 * 1024]; // 10 MB
